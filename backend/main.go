@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 	"syscall"
 
 	"nvtop-server/api"
+	"nvtop-server/config"
 	"nvtop-server/gpu"
 	"nvtop-server/ws"
 )
@@ -18,6 +21,16 @@ import (
 var frontendFiles embed.FS
 
 func main() {
+	// Parse command-line flags
+	configPath := flag.String("config", "config.yaml", "path to config file")
+	flag.Parse()
+
+	// Load configuration
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	// Initialize NVML
 	if err := gpu.Init(); err != nil {
 		log.Printf("WARNING: NVML init failed: %v (running without GPU monitoring)", err)
@@ -26,7 +39,7 @@ func main() {
 	}
 
 	// Start WebSocket hub
-	hub := ws.NewHub()
+	hub := ws.NewHub(cfg.Monitor.PollIntervalSeconds)
 	hub.Start()
 	defer hub.Stop()
 
@@ -50,12 +63,18 @@ func main() {
 	}
 
 	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	if port != "" {
+		cfg.Server.Port = 0
+		fmt.Sscanf(port, "%d", &cfg.Server.Port)
+	}
+	if cfg.Server.Port == 0 {
+		cfg.Server.Port = 8080
 	}
 
-	addr := ":" + port
-	log.Printf("nvtop-web server starting on http://localhost%s", addr)
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	log.Printf("nvtop-web server starting on http://%s", addr)
+	log.Printf("Config: poll_interval=%ds, history_size=%d, log_level=%s",
+		cfg.Monitor.PollIntervalSeconds, cfg.Monitor.HistorySize, cfg.Log.Level)
 
 	// Graceful shutdown
 	go func() {

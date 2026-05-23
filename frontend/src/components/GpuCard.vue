@@ -20,37 +20,55 @@
       </div>
     </div>
 
-    <!-- Summary metrics row -->
-    <div class="grid grid-cols-3 sm:grid-cols-6 divide-x divide-gray-100 border-b border-gray-100">
-      <div class="p-3 text-center">
-        <div class="text-[10px] text-gray-400 uppercase">Mem</div>
-        <div class="text-sm font-semibold tabular-nums" :class="usageColor(gpu.utilization_memory)">
-          {{ gpu.utilization_memory }}%
+    <!-- Summary metrics row with circular gauges -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 border-b border-gray-100">
+      <!-- GPU Utilization Gauge -->
+      <CircularGauge
+        :value="gpu.utilization_gpu"
+        :max="100"
+        label="GPU"
+        unit="%"
+        :size="90"
+      />
+
+      <!-- Memory Gauge -->
+      <CircularGauge
+        :value="gpu.utilization_memory"
+        :max="100"
+        label="Memory"
+        :sub-label="formatMB(gpu.memory_used_mb) + '/' + formatMB(gpu.memory_total_mb)"
+        unit="%"
+        :size="90"
+      />
+
+      <!-- Temperature -->
+      <div class="flex flex-col items-center justify-center">
+        <span class="text-lg font-bold tabular-nums" :class="tempColor(gpu.temperature_c)">
+          {{ gpu.temperature_c }}<span class="text-sm">°C</span>
+        </span>
+        <span class="text-[11px] text-gray-500 font-medium">Temp</span>
+      </div>
+
+      <!-- Power -->
+      <div class="flex flex-col items-center justify-center">
+        <span class="text-lg font-bold tabular-nums">{{ gpu.power_w }}<span class="text-sm">W</span></span>
+        <span class="text-[11px] text-gray-500 font-medium">Power</span>
+        <span class="text-[10px] text-gray-400">{{ gpu.power_limit_w }}W limit</span>
+      </div>
+
+      <!-- Fan Speed -->
+      <div class="flex flex-col items-center justify-center">
+        <span class="text-lg font-bold tabular-nums">{{ gpu.fan_speed }}<span class="text-sm">%</span></span>
+        <span class="text-[11px] text-gray-500 font-medium">Fan</span>
+      </div>
+
+      <!-- Clocks -->
+      <div class="flex flex-col items-center justify-center">
+        <div class="text-sm font-bold tabular-nums">
+          <div>{{ gpu.clock_core_mhz }}<span class="text-xs">MHz</span></div>
+          <div class="text-gray-400">{{ gpu.clock_memory_mhz }}<span class="text-xs">MHz</span></div>
         </div>
-        <div class="text-[10px] text-gray-400">{{ formatMB(gpu.memory_used_mb) }}/{{ formatMB(gpu.memory_total_mb) }}</div>
-      </div>
-      <div class="p-3 text-center">
-        <div class="text-[10px] text-gray-400 uppercase">Temp</div>
-        <div class="text-sm font-semibold tabular-nums" :class="tempColor(gpu.temperature_c)">
-          {{ gpu.temperature_c }}<span class="text-xs">°C</span>
-        </div>
-      </div>
-      <div class="p-3 text-center">
-        <div class="text-[10px] text-gray-400 uppercase">Power</div>
-        <div class="text-sm font-semibold tabular-nums">{{ gpu.power_w }}<span class="text-xs">W</span></div>
-        <div class="text-[10px] text-gray-400">{{ gpu.power_limit_w }}W limit</div>
-      </div>
-      <div class="p-3 text-center">
-        <div class="text-[10px] text-gray-400 uppercase">Fan</div>
-        <div class="text-sm font-semibold tabular-nums">{{ gpu.fan_speed }}%</div>
-      </div>
-      <div class="p-3 text-center">
-        <div class="text-[10px] text-gray-400 uppercase">Core</div>
-        <div class="text-sm font-semibold tabular-nums">{{ gpu.clock_core_mhz }}<span class="text-xs">MHz</span></div>
-      </div>
-      <div class="p-3 text-center">
-        <div class="text-[10px] text-gray-400 uppercase">MemClk</div>
-        <div class="text-sm font-semibold tabular-nums">{{ gpu.clock_memory_mhz }}<span class="text-xs">MHz</span></div>
+        <span class="text-[11px] text-gray-500 font-medium">Core/Mem</span>
       </div>
     </div>
 
@@ -63,7 +81,6 @@
 
       <!-- Extra metrics + Processes -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-0 lg:gap-0 border-t border-gray-100">
-        <!-- Extra GPU metrics -->
         <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-100">
           <h4 class="text-xs font-medium text-gray-500 uppercase mb-3">Details</h4>
           <div class="grid grid-cols-2 gap-2 text-xs">
@@ -105,6 +122,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import CircularGauge from './CircularGauge.vue'
 import GpuLineChart from './GpuLineChart.vue'
 import ProcessTable from './ProcessTable.vue'
 

@@ -1,0 +1,12 @@
+# nvtop-web server configuration
+
+server:
+  host: "0.0.0.0"   # 监听地址，0.0.0.0 表示所有网卡
+  port: 20009         # 监听端口
+
+monitor:
+  poll_interval_seconds: 1   # GPU 数据采集间隔 (秒)
+  history_size: 60           # 前端图表历史数据点数
+
+log:
+  level: "info"      # 日志级别: debug, info, warn, error

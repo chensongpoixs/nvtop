@@ -27,17 +27,22 @@ type Hub struct {
 	mu      sync.RWMutex
 	clients map[*client]bool
 
-	driverVer string
-	cudaVer   string
+	driverVer    string
+	cudaVer      string
+	pollInterval int
 
 	stopCh chan struct{}
 }
 
-// NewHub creates a new Hub
-func NewHub() *Hub {
+// NewHub creates a new Hub with the given poll interval in seconds
+func NewHub(pollIntervalSec int) *Hub {
+	if pollIntervalSec <= 0 {
+		pollIntervalSec = 1
+	}
 	return &Hub{
-		clients: make(map[*client]bool),
-		stopCh:  make(chan struct{}),
+		clients:      make(map[*client]bool),
+		stopCh:       make(chan struct{}),
+		pollInterval: pollIntervalSec,
 	}
 }
 
@@ -56,7 +61,7 @@ func (h *Hub) Stop() {
 }
 
 func (h *Hub) broadcastLoop() {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(time.Duration(h.pollInterval) * time.Second)
 	defer ticker.Stop()
 
 	for {

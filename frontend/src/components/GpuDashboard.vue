@@ -29,40 +29,26 @@
     <!-- System Info: CPU & Memory -->
     <section class="mb-6" v-if="snapshot?.system">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- CPU Overall -->
+        <!-- CPU Overall Gauge -->
         <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">CPU Usage</span>
-            <span class="text-lg font-bold" :class="usageColor(snapshot.system.cpu_usage_percent)">
-              {{ snapshot.system.cpu_usage_percent?.toFixed(1) }}%
-            </span>
-          </div>
-          <div class="w-full bg-gray-100 rounded-full h-2">
-            <div class="h-2 rounded-full transition-all duration-500"
-              :class="usageBarColor(snapshot.system.cpu_usage_percent)"
-              :style="{ width: snapshot.system.cpu_usage_percent + '%' }">
-            </div>
-          </div>
+          <CircularGauge
+            :value="snapshot.system.cpu_usage_percent"
+            :max="100"
+            label="CPU"
+            :sub-label="snapshot.system.cpu_per_core_percent?.length + ' cores'"
+            unit="%"
+          />
         </div>
 
-        <!-- Memory Usage -->
+        <!-- Memory Gauge -->
         <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Memory</span>
-            <span class="text-lg font-bold" :class="usageColor(snapshot.system.memory_usage_percent)">
-              {{ snapshot.system.memory_usage_percent?.toFixed(1) }}%
-            </span>
-          </div>
-          <div class="w-full bg-gray-100 rounded-full h-2 mb-1">
-            <div class="h-2 rounded-full transition-all duration-500"
-              :class="usageBarColor(snapshot.system.memory_usage_percent)"
-              :style="{ width: snapshot.system.memory_usage_percent + '%' }">
-            </div>
-          </div>
-          <div class="flex justify-between text-xs text-gray-400">
-            <span>{{ formatMB(snapshot.system.memory_used_mb) }} used</span>
-            <span>{{ formatMB(snapshot.system.memory_total_mb) }} total</span>
-          </div>
+          <CircularGauge
+            :value="snapshot.system.memory_usage_percent"
+            :max="100"
+            label="Memory"
+            :sub-label="formatMB(snapshot.system.memory_used_mb) + ' / ' + formatMB(snapshot.system.memory_total_mb)"
+            unit="%"
+          />
         </div>
 
         <!-- CPU per-core (summary) -->
@@ -104,8 +90,9 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket.js'
+import CircularGauge from './CircularGauge.vue'
 import GpuCard from './GpuCard.vue'
 
 const { data, connected } = useWebSocket()
@@ -118,7 +105,6 @@ watch(data, (newData) => {
   if (!newData) return
   snapshot.value = newData
 
-  // Build per-GPU history
   if (newData.gpus) {
     newData.gpus.forEach((gpu) => {
       if (!historyData.value[gpu.index]) {
