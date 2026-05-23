@@ -33,7 +33,7 @@ var Default = Config{
 	},
 	Monitor: MonitorConfig{
 		PollIntervalSeconds: 1,
-		HistorySize:         60,
+		HistorySize:         3600,
 	},
 	Log: LogConfig{
 		Level: "info",

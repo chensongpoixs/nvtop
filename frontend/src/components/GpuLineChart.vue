@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h4 class="text-xs font-medium text-gray-500 uppercase mb-3">History (60s)</h4>
+    <h4 class="text-xs font-medium text-gray-500 uppercase mb-3">History (1h)</h4>
     <div class="h-48">
       <canvas ref="canvasRef"></canvas>
     </div>
@@ -127,7 +127,7 @@ watch(() => props.history, (hist) => {
   chart.data.datasets[1].data = hist.map((h) => h.mem)
   chart.data.datasets[2].data = hist.map((h) => h.temp)
   chart.update('none')
-}, { deep: false })
+})
 
 onMounted(() => {
   createChart()

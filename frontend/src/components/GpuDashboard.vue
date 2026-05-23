@@ -99,7 +99,7 @@ const { data, connected } = useWebSocket()
 const snapshot = ref(null)
 const historyData = ref({})
 
-const MAX_HISTORY = 60
+const MAX_HISTORY = 3600
 
 watch(data, (newData) => {
   if (!newData) return
@@ -107,20 +107,18 @@ watch(data, (newData) => {
 
   if (newData.gpus) {
     newData.gpus.forEach((gpu) => {
-      if (!historyData.value[gpu.index]) {
-        historyData.value[gpu.index] = []
-      }
-      const hist = historyData.value[gpu.index]
-      hist.push({
+      const existing = historyData.value[gpu.index] || []
+      const updated = [...existing, {
         time: newData.timestamp,
         gpu: gpu.utilization_gpu,
         mem: gpu.utilization_memory,
         temp: gpu.temperature_c,
         power: gpu.power_w,
-      })
-      if (hist.length > MAX_HISTORY) {
-        hist.splice(0, hist.length - MAX_HISTORY)
+      }]
+      if (updated.length > MAX_HISTORY) {
+        updated.splice(0, updated.length - MAX_HISTORY)
       }
+      historyData.value[gpu.index] = updated
     })
   }
 })
