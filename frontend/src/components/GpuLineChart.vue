@@ -63,6 +63,19 @@ function createChart() {
           borderDash: [4, 2],
           order: 3,
         },
+        {
+          label: 'Mem Temp °C',
+          data: [],
+          borderColor: '#ef4444',
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          borderDash: [3, 3],
+          order: 4,
+          hidden: true,
+        },
       ],
     },
     options: {
@@ -126,6 +139,7 @@ watch(() => props.history, (hist) => {
   chart.data.datasets[0].data = hist.map((h) => h.gpu)
   chart.data.datasets[1].data = hist.map((h) => h.mem)
   chart.data.datasets[2].data = hist.map((h) => h.temp)
+  chart.data.datasets[3].data = hist.map((h) => h.memTemp)
   chart.update('none')
 })
 

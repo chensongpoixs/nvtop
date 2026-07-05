@@ -4,6 +4,9 @@ set -e
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 GOPATH="${GOPATH:-$(go env GOPATH 2>/dev/null || echo $HOME/go)}"
 GO="${GOPATH}/bin/go"
+if [ ! -x "$GO" ]; then
+	GO="$(which go 2>/dev/null || echo go)"
+fi
 
 echo "==> Building Vue frontend..."
 cd "$BASEDIR/frontend"

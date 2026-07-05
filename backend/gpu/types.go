@@ -20,6 +20,26 @@ type GPUInfo struct {
 	EncoderUtil      int          `json:"encoder_util"`
 	DecoderUtil      int          `json:"decoder_util"`
 	Processes        []GPUProcess `json:"processes"`
+
+	// Advanced metrics
+	PCIeCurrentGen           int      `json:"pcie_current_gen"`
+	PCIeCurrentWidth         int      `json:"pcie_current_width"`
+	PCIeMaxGen               int      `json:"pcie_max_gen"`
+	PCIeMaxWidth             int      `json:"pcie_max_width"`
+	ClocksThrottleReasons    uint64   `json:"clocks_throttle_reasons"`
+	ClocksThrottleReasonsText []string `json:"clocks_throttle_reasons_text"`
+	MemoryTemperatureC       int      `json:"memory_temperature_c"`
+	PerformanceState         int      `json:"performance_state"`
+	MemoryBusWidth           int      `json:"memory_bus_width"`
+	MaxMemoryClockMHz        int      `json:"max_memory_clock_mhz"`
+	MemoryBandwidthGBps      float64  `json:"memory_bandwidth_gbps"`
+	BAR1TotalMB              uint64   `json:"bar1_total_mb"`
+	BAR1UsedMB               uint64   `json:"bar1_used_mb"`
+	ECCMode                  string   `json:"ecc_mode"`
+	ECCErrorsCount           uint64   `json:"ecc_errors_count"`
+	ComputeMode              string   `json:"compute_mode"`
+	NVLinkActiveLinks        int      `json:"nvlink_active_links"`
+	NVLinkMaxLinks           int      `json:"nvlink_max_links"`
 }
 
 // GPUProcess holds information about a process running on a GPU

@@ -114,6 +114,7 @@ watch(data, (newData) => {
         mem: gpu.utilization_memory,
         temp: gpu.temperature_c,
         power: gpu.power_w,
+        memTemp: gpu.memory_temperature_c || 0,
       }]
       if (updated.length > MAX_HISTORY) {
         updated.splice(0, updated.length - MAX_HISTORY)

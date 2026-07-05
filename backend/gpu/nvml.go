@@ -6,6 +6,14 @@ package gpu
 
 #include <nvml.h>
 #include <stdlib.h>
+
+// Helper to get unsigned int value from a field value
+static unsigned int getFieldValueUint(nvmlFieldValue_t *fv) {
+	if (fv->nvmlReturn == NVML_SUCCESS) {
+		return fv->value.uiVal;
+	}
+	return 0;
+}
 */
 import "C"
 
@@ -187,6 +195,100 @@ func getGPUInfo(index int) (GPUInfo, error) {
 		info.DecoderUtil = int(decUtil)
 	}
 
+	// --- Advanced metrics ---
+
+	// PCIe link negotiation rate (current vs max)
+	var pcieCurrGen, pcieMaxGen, pcieCurrWidth, pcieMaxWidth C.uint
+	if result := C.nvmlDeviceGetCurrPcieLinkGeneration(device, &pcieCurrGen); result == C.NVML_SUCCESS {
+		info.PCIeCurrentGen = int(pcieCurrGen)
+	}
+	if result := C.nvmlDeviceGetMaxPcieLinkGeneration(device, &pcieMaxGen); result == C.NVML_SUCCESS {
+		info.PCIeMaxGen = int(pcieMaxGen)
+	}
+	if result := C.nvmlDeviceGetCurrPcieLinkWidth(device, &pcieCurrWidth); result == C.NVML_SUCCESS {
+		info.PCIeCurrentWidth = int(pcieCurrWidth)
+	}
+	if result := C.nvmlDeviceGetMaxPcieLinkWidth(device, &pcieMaxWidth); result == C.NVML_SUCCESS {
+		info.PCIeMaxWidth = int(pcieMaxWidth)
+	}
+
+	// Clocks throttle reasons
+	var throttleReasons C.ulonglong
+	if result := C.nvmlDeviceGetCurrentClocksThrottleReasons(device, &throttleReasons); result == C.NVML_SUCCESS {
+		info.ClocksThrottleReasons = uint64(throttleReasons)
+		info.ClocksThrottleReasonsText = parseThrottleReasons(uint64(throttleReasons))
+	}
+
+	// Memory temperature via Field Values API (fieldId 195 = NVML_FI_DEV_TEMPERATURE_MEM_MAX_TLIMIT)
+	var memTempField [1]C.nvmlFieldValue_t
+	memTempField[0].fieldId = 195
+	memTempField[0].scopeId = 0
+	if result := C.nvmlDeviceGetFieldValues(device, 1, &memTempField[0]); result == C.NVML_SUCCESS {
+		info.MemoryTemperatureC = int(C.getFieldValueUint(&memTempField[0]))
+	}
+
+	// Performance state (P0=highest perf, P15=lowest)
+	var pState C.nvmlPstates_t
+	if result := C.nvmlDeviceGetPerformanceState(device, &pState); result == C.NVML_SUCCESS {
+		info.PerformanceState = int(pState)
+	}
+
+	// Memory bus width and max memory clock
+	var memBusWidth C.uint
+	if result := C.nvmlDeviceGetMemoryBusWidth(device, &memBusWidth); result == C.NVML_SUCCESS {
+		info.MemoryBusWidth = int(memBusWidth)
+	}
+	var maxMemClock C.uint
+	if result := C.nvmlDeviceGetMaxClockInfo(device, C.NVML_CLOCK_MEM, &maxMemClock); result == C.NVML_SUCCESS {
+		info.MaxMemoryClockMHz = int(maxMemClock)
+	}
+	// Theoretical memory bandwidth: width(bits) × clock(MHz) × 2(DDR) / 8(bytes) / 1000(→GB/s)
+	if info.MemoryBusWidth > 0 && info.MaxMemoryClockMHz > 0 {
+		info.MemoryBandwidthGBps = float64(info.MemoryBusWidth) * float64(info.MaxMemoryClockMHz) * 2 / 8 / 1000
+	}
+
+	// BAR1 memory (PCIe BAR for GPU memory mapping, relevant for CUDA UVM)
+	var bar1 C.nvmlBAR1Memory_t
+	if result := C.nvmlDeviceGetBAR1MemoryInfo(device, &bar1); result == C.NVML_SUCCESS {
+		info.BAR1TotalMB = uint64(bar1.bar1Total) / (1024 * 1024)
+		info.BAR1UsedMB = uint64(bar1.bar1Used) / (1024 * 1024)
+	}
+
+	// ECC mode and error counts
+	var eccCurrent, eccPending C.nvmlEnableState_t
+	if result := C.nvmlDeviceGetEccMode(device, &eccCurrent, &eccPending); result == C.NVML_SUCCESS {
+		if eccCurrent == C.NVML_FEATURE_ENABLED {
+			info.ECCMode = "Enabled"
+		} else if eccCurrent == C.NVML_FEATURE_DISABLED {
+			info.ECCMode = "Disabled"
+		}
+	}
+	var eccErrors C.ulonglong
+	if result := C.nvmlDeviceGetTotalEccErrors(device, C.NVML_MEMORY_ERROR_TYPE_UNCORRECTED, C.NVML_AGGREGATE_ECC, &eccErrors); result == C.NVML_SUCCESS {
+		info.ECCErrorsCount = uint64(eccErrors)
+	}
+
+	// Compute mode
+	var compMode C.nvmlComputeMode_t
+	if result := C.nvmlDeviceGetComputeMode(device, &compMode); result == C.NVML_SUCCESS {
+		info.ComputeMode = computeModeString(compMode)
+	}
+
+	// NVLink state
+	var nvlinkActive, nvlinkMax int
+	for link := C.uint(0); link < C.NVML_NVLINK_MAX_LINKS; link++ {
+		var isActive C.nvmlEnableState_t
+		if result := C.nvmlDeviceGetNvLinkState(device, link, &isActive); result != C.NVML_SUCCESS {
+			break
+		}
+		nvlinkMax++
+		if isActive == C.NVML_FEATURE_ENABLED {
+			nvlinkActive++
+		}
+	}
+	info.NVLinkActiveLinks = nvlinkActive
+	info.NVLinkMaxLinks = nvlinkMax
+
 	// Running processes
 	info.Processes = getProcesses(device)
 
@@ -250,4 +352,63 @@ func getProcessName(pid uint) string {
 		return C.GoString(&name[0])
 	}
 	return fmt.Sprintf("PID %d", pid)
+}
+
+// parseThrottleReasons converts a clocks throttle reasons bitmask to human-readable strings.
+// Bit definitions from nvml.h:
+//
+//	bit 0: GpuIdle           - GPU is idle and clocks are lowered
+//	bit 1: AppClocks         - Applications clocks setting is limiting
+//	bit 2: SwPowerCap        - Software power cap is limiting
+//	bit 3: HwSlowdown        - Hardware slowdown (thermal or power brake)
+//	bit 4: SyncBoost         - Sync boost is active (raising clocks)
+//	bit 5: SwThermal         - Software thermal slowdown
+//	bit 6: HwThermal         - Hardware thermal slowdown
+//	bit 7: HwPowerBrake      - Hardware power brake slowdown
+//	bit 8: DisplayClock      - Display clock setting is limiting
+//	bit 9: NwSlowdown        - Network slowdown (NVLink/Switch related)
+func parseThrottleReasons(reasons uint64) []string {
+	if reasons == 0 {
+		return nil
+	}
+
+	bitNames := []struct {
+		bit  uint64
+		name string
+	}{
+		{1 << 0, "GPU Idle"},
+		{1 << 1, "App Clock Setting"},
+		{1 << 2, "SW Power Cap"},
+		{1 << 3, "HW Slowdown"},
+		{1 << 4, "Sync Boost"},
+		{1 << 5, "SW Thermal"},
+		{1 << 6, "HW Thermal"},
+		{1 << 7, "HW Power Brake"},
+		{1 << 8, "Display Clock"},
+		{1 << 9, "NVLink Slowdown"},
+	}
+
+	var result []string
+	for _, b := range bitNames {
+		if reasons&b.bit != 0 {
+			result = append(result, b.name)
+		}
+	}
+	return result
+}
+
+// computeModeString converts an NVML compute mode enum to a human-readable string.
+func computeModeString(mode C.nvmlComputeMode_t) string {
+	switch mode {
+	case C.NVML_COMPUTEMODE_DEFAULT:
+		return "Default"
+	case C.NVML_COMPUTEMODE_EXCLUSIVE_THREAD:
+		return "Exclusive Thread"
+	case C.NVML_COMPUTEMODE_PROHIBITED:
+		return "Prohibited"
+	case C.NVML_COMPUTEMODE_EXCLUSIVE_PROCESS:
+		return "Exclusive Process"
+	default:
+		return fmt.Sprintf("Unknown (%d)", int(mode))
+	}
 }
