@@ -28,7 +28,7 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 | `backend/config/config.go` | YAML 配置加载，`Default` 变量定义默认值，`PORT` 环境变量覆盖端口 |
 | `backend/gpu/types.go` | `GPUInfo`、`GPUProcess`、`SystemInfo`、`Snapshot` 数据结构 |
 | `backend/gpu/nvml.go` | CGO NVML 封装：`Init()`/`Shutdown()` 生命周期，`GetAllGPUInfo()` 采集所有 GPU 指标（基础+高级+DeviceQuery）和进程；`parseThrottleReasons()` 解析时钟节流位掩码；`computeModeString()` / `brandToString()` / `archToString()` 映射枚举 |
-| `backend/gpu/cuda.go` | CGO CUDA Driver API 封装：`CUDAInit()` 初始化，`getCUDAProps()` 通过 `cuDeviceGetAttribute()` 采集 SM 数量、L2 Cache、Thread 限制、Shared Memory、Warp Size、特性标志等 deviceQuery 属性 |
+| `backend/gpu/cuda.go` | CGO CUDA Driver API 封装：`CUDAInit()` 初始化，`getCUDAProps()` 通过 `cuDeviceGetAttribute()` 采集 SM 数量、L2 Cache、Thread 限制、Shared Memory、Warp Size、特性标志等 deviceQuery 属性；`coresPerSM()` 按 CC 查表（CC→cores/SM），用于 NVML `nvmlDeviceGetNumGpuCores` 不支持的 GPU（如 Blackwell）回退计算 CUDA Cores = SMs × coresPerSM |
 | `backend/gpu/system.go` | 从 `/proc/stat` 和 `/proc/meminfo` 读取 CPU/内存（两次采样差值计算 CPU 使用率） |
 | `backend/api/handler.go` | `GET /api/gpus` REST 端点返回 JSON 快照 |
 | `backend/ws/hub.go` | WebSocket Hub：连接管理 + ticker 每秒采集广播；`readPump`/`writePump` goroutine 模式 |
@@ -51,13 +51,14 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 | I/O | NVLink 活动/最大链路数 | `nvmlDeviceGetNvLinkState` 遍历 |
 | Reliability | ECC 模式（Enabled/Disabled）、不可纠正 ECC 错误计数 | `nvmlDeviceGetEccMode` / `nvmlDeviceGetTotalEccErrors` |
 | Compute | 计算模式（Default/Exclusive/Prohibited） | `nvmlDeviceGetComputeMode` |
-| Device | CUDA Compute Capability（如 "8.9"）→ 前端 Device 属性条 | `nvmlDeviceGetCudaComputeCapability` |
-| Device | CUDA Cores 数量（如 16384）→ 前端 Device 属性条 | `nvmlDeviceGetNumGpuCores` |
+| Device | CUDA Compute Capability（如 "8.9"） | `nvmlDeviceGetCudaComputeCapability` |
 | Device | Max SM Clock (MHz) → 前端 Device 属性条 | `nvmlDeviceGetMaxClockInfo(NVML_CLOCK_SM)` |
 | Device | VBIOS 固件版本字符串 → 前端 Device 属性条 | `nvmlDeviceGetVbiosVersion` |
 | Device | GPU Brand（GeForce/Quadro/Tesla/NVIDIA RTX/…） | `nvmlDeviceGetBrand` + `brandToString()` |
 | Device | GPU 架构名（Kepler/Maxwell/Pascal/Volta/Turing/Ampere/Ada/Hopper/Blackwell） | `nvmlDeviceGetArchitecture` + `archToString()` |
-| Device | SM 数量、L2 Cache 大小 (KB)、Shared Memory/Block (KB)、Shared Memory/SM (KB) | `cuDeviceGetAttribute` (CUDA Driver API) |
+| Device | SM 数量（优先 CUDA Driver API，回退 NVML `nvmlDeviceGetAttributes`） | `cuDeviceGetAttribute` / `nvmlDeviceGetAttributes` |
+| Device | CUDA Cores（优先 NVML `GetNumGpuCores`，失败则 SM × coresPerSM CC 查表回退） | `nvmlDeviceGetNumGpuCores` / `coresPerSM()` 查表计算 |
+| Device | L2 Cache 大小 (KB)、Shared Memory/Block (KB)、Shared Memory/SM (KB) | `cuDeviceGetAttribute` (CUDA Driver API) |
 | Device | Register/Block、Max Threads/Block、Max Threads/SM、Warp Size | `cuDeviceGetAttribute` (CUDA Driver API) |
 | Device | Concurrent Kernels、Copy Engines、Compute Preemption | `cuDeviceGetAttribute` (CUDA Driver API) |
 | Device | Cooperative Launch、Multi-Device Coop、Managed Memory、UVA | `cuDeviceGetAttribute` (CUDA Driver API) |

@@ -8,7 +8,11 @@ package gpu
 #include <stdlib.h>
 */
 import "C"
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 var cudaInitialized bool
 
@@ -47,6 +51,15 @@ func getCUDAProps(info *GPUInfo) {
 	}
 
 	info.SMs = getAttr(C.CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT)
+
+	// Backfill NumCores if NVML nvmlDeviceGetNumGpuCores failed (unsupported on Blackwell+).
+	// CUDA cores = SMs × cores-per-SM, where cores-per-SM is derived from compute capability.
+	if info.NumCores == 0 && info.SMs > 0 && info.ComputeCapability != "" {
+		if cpsm := coresPerSM(info.ComputeCapability); cpsm > 0 {
+			info.NumCores = info.SMs * cpsm
+		}
+	}
+
 	info.L2CacheSizeKB = getAttr(C.CU_DEVICE_ATTRIBUTE_L2_CACHE_SIZE) / 1024
 	info.SharedMemPerBlockKB = getAttr(C.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK) / 1024
 	info.SharedMemPerSMKB = getAttr(C.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_MULTIPROCESSOR) / 1024
@@ -63,4 +76,52 @@ func getCUDAProps(info *GPUInfo) {
 	info.UnifiedAddressing = getAttr(C.CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING) != 0
 	info.Integrated = getAttr(C.CU_DEVICE_ATTRIBUTE_INTEGRATED) != 0
 	info.KernelTimeout = getAttr(C.CU_DEVICE_ATTRIBUTE_KERNEL_EXEC_TIMEOUT) != 0
+}
+
+// coresPerSM returns the number of CUDA cores per SM for a given compute capability.
+// This lookup table mirrors the CUDA deviceQuery logic (see CUDA Programming Guide).
+// Returns 0 if the compute capability string is malformed or unrecognized.
+func coresPerSM(cc string) int {
+	// Parse "major.minor" string
+	dot := strings.IndexByte(cc, '.')
+	if dot < 0 {
+		return 0
+	}
+	major, err := strconv.Atoi(cc[:dot])
+	if err != nil {
+		return 0
+	}
+	minor, err := strconv.Atoi(cc[dot+1:])
+	if err != nil {
+		return 0
+	}
+
+	switch {
+	case major >= 12:
+		return 128 // Blackwell
+	case major == 9:
+		return 128 // Hopper
+	case major == 8:
+		if minor >= 6 {
+			return 128 // GA10x Ampere (RTX 30 series)
+		}
+		return 64 // A100 (SM 8.0)
+	case major == 7:
+		return 64 // Volta / Turing
+	case major == 6:
+		return 64 // Pascal
+	case major == 5:
+		return 128 // Maxwell
+	case major == 3:
+		return 192 // Kepler
+	case major == 2:
+		if minor >= 1 {
+			return 48 // Fermi 2.1
+		}
+		return 32 // Fermi 2.0
+	case major == 1:
+		return 8 // Tesla
+	default:
+		return 0
+	}
 }

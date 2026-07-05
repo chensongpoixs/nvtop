@@ -334,6 +334,18 @@ func getGPUInfo(index int) (GPUInfo, error) {
 	// CUDA Driver API device attributes (SM count, L2 cache, warp size, thread limits, etc.)
 	getCUDAProps(&info)
 
+	// NVML fallback for SM count if CUDA Driver API unavailable
+	if info.SMs == 0 {
+		var attrs C.nvmlDeviceAttributes_t
+		if result := C.nvmlDeviceGetAttributes(device, &attrs); result == C.NVML_SUCCESS {
+			info.SMs = int(attrs.multiprocessorCount)
+			// If NVML NumCores also failed, backfill from SMs
+			if info.NumCores == 0 && info.SMs > 0 && info.ComputeCapability != "" {
+				info.NumCores = info.SMs * coresPerSM(info.ComputeCapability)
+			}
+		}
+	}
+
 	// Running processes
 	info.Processes = getProcesses(device)
 
