@@ -85,3 +85,24 @@ body {
 .pcie-link { font-family: 'Courier New', monospace; font-size: 12px; }
 .pcie-current { color: #2563eb; font-weight: 600; }
 .pcie-max { color: #9ca3af; }
+
+/* Architecture badge */
+.arch-badge {
+  display: inline-flex;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.arch-blackwell { background: #7c3aed; color: #fff; }
+.arch-hopper    { background: #0891b2; color: #fff; }
+.arch-ada       { background: #16a34a; color: #fff; }
+.arch-ampere    { background: #2563eb; color: #fff; }
+.arch-turing    { background: #4f46e5; color: #fff; }
+.arch-volta     { background: #ea580c; color: #fff; }
+.arch-pascal    { background: #dc2626; color: #fff; }
+.arch-maxwell   { background: #9333ea; color: #fff; }
+.arch-kepler    { background: #78716c; color: #fff; }
+.arch-other     { background: #d1d5db; color: #374151; }

@@ -293,6 +293,47 @@ func getGPUInfo(index int) (GPUInfo, error) {
 	info.NVLinkActiveLinks = nvlinkActive
 	info.NVLinkMaxLinks = nvlinkMax
 
+	// --- DeviceQuery-style static device properties ---
+
+	// CUDA Compute Capability
+	var ccMajor, ccMinor C.int
+	if result := C.nvmlDeviceGetCudaComputeCapability(device, &ccMajor, &ccMinor); result == C.NVML_SUCCESS {
+		info.ComputeCapability = fmt.Sprintf("%d.%d", int(ccMajor), int(ccMinor))
+	}
+
+	// Number of CUDA Cores
+	var numCores C.uint
+	if result := C.nvmlDeviceGetNumGpuCores(device, &numCores); result == C.NVML_SUCCESS {
+		info.NumCores = int(numCores)
+	}
+
+	// Max SM Clock
+	var maxSMClock C.uint
+	if result := C.nvmlDeviceGetMaxClockInfo(device, C.NVML_CLOCK_SM, &maxSMClock); result == C.NVML_SUCCESS {
+		info.MaxSMClockMHz = int(maxSMClock)
+	}
+
+	// VBIOS Version
+	var vbios [C.NVML_DEVICE_VBIOS_VERSION_BUFFER_SIZE]C.char
+	if result := C.nvmlDeviceGetVbiosVersion(device, &vbios[0], C.NVML_DEVICE_VBIOS_VERSION_BUFFER_SIZE); result == C.NVML_SUCCESS {
+		info.VBIOSVersion = C.GoString(&vbios[0])
+	}
+
+	// GPU Brand
+	var brand C.nvmlBrandType_t
+	if result := C.nvmlDeviceGetBrand(device, &brand); result == C.NVML_SUCCESS {
+		info.Brand = brandToString(brand)
+	}
+
+	// GPU Architecture (Kepler / Maxwell / Pascal / Volta / Turing / Ampere / Ada / Hopper / Blackwell)
+	var arch C.nvmlDeviceArchitecture_t
+	if result := C.nvmlDeviceGetArchitecture(device, &arch); result == C.NVML_SUCCESS {
+		info.Architecture = archToString(arch)
+	}
+
+	// CUDA Driver API device attributes (SM count, L2 cache, warp size, thread limits, etc.)
+	getCUDAProps(&info)
+
 	// Running processes
 	info.Processes = getProcesses(device)
 
@@ -399,6 +440,74 @@ func parseThrottleReasons(reasons uint64) []string {
 		}
 	}
 	return result
+}
+
+// brandToString converts an NVML brand type enum to a human-readable string.
+func brandToString(brand C.nvmlBrandType_t) string {
+	switch brand {
+	case C.NVML_BRAND_GEFORCE:
+		return "GeForce"
+	case C.NVML_BRAND_QUADRO:
+		return "Quadro"
+	case C.NVML_BRAND_TESLA:
+		return "Tesla"
+	case C.NVML_BRAND_NVS:
+		return "NVS"
+	case C.NVML_BRAND_GRID:
+		return "GRID"
+	case C.NVML_BRAND_TITAN:
+		return "TITAN"
+	case C.NVML_BRAND_QUADRO_RTX:
+		return "Quadro RTX"
+	case C.NVML_BRAND_NVIDIA_RTX:
+		return "NVIDIA RTX"
+	case C.NVML_BRAND_NVIDIA:
+		return "NVIDIA"
+	case C.NVML_BRAND_GEFORCE_RTX:
+		return "GeForce RTX"
+	case C.NVML_BRAND_TITAN_RTX:
+		return "TITAN RTX"
+	case C.NVML_BRAND_NVIDIA_VAPPS:
+		return "NVIDIA vApps"
+	case C.NVML_BRAND_NVIDIA_VPC:
+		return "NVIDIA vPC"
+	case C.NVML_BRAND_NVIDIA_VCS:
+		return "NVIDIA vCS"
+	case C.NVML_BRAND_NVIDIA_VWS:
+		return "NVIDIA vWS"
+	case C.NVML_BRAND_NVIDIA_CLOUD_GAMING:
+		return "NVIDIA Cloud Gaming"
+	default:
+		return fmt.Sprintf("Unknown (%d)", int(brand))
+	}
+}
+
+// archToString converts an NVML device architecture enum to a human-readable string.
+func archToString(arch C.nvmlDeviceArchitecture_t) string {
+	switch arch {
+	case C.NVML_DEVICE_ARCH_KEPLER:
+		return "Kepler"
+	case C.NVML_DEVICE_ARCH_MAXWELL:
+		return "Maxwell"
+	case C.NVML_DEVICE_ARCH_PASCAL:
+		return "Pascal"
+	case C.NVML_DEVICE_ARCH_VOLTA:
+		return "Volta"
+	case C.NVML_DEVICE_ARCH_TURING:
+		return "Turing"
+	case C.NVML_DEVICE_ARCH_AMPERE:
+		return "Ampere"
+	case C.NVML_DEVICE_ARCH_ADA:
+		return "Ada"
+	case C.NVML_DEVICE_ARCH_HOPPER:
+		return "Hopper"
+	// CUDA 13.0+ defines NVML_DEVICE_ARCH_BLACKWELL = 10
+	default:
+		if int(arch) == 10 {
+			return "Blackwell"
+		}
+		return fmt.Sprintf("Unknown (%d)", int(arch))
+	}
 }
 
 // computeModeString converts an NVML compute mode enum to a human-readable string.

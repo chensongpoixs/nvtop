@@ -24,10 +24,11 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 
 | 包 | 职责 |
 |---|---|
-| `backend/main.go` | 入口：初始化 NVML → 启动 WebSocket Hub → 注册路由 → HTTP 监听 |
+| `backend/main.go` | 入口：初始化 NVML → 初始化 CUDA → 启动 WebSocket Hub → 注册路由 → HTTP 监听 |
 | `backend/config/config.go` | YAML 配置加载，`Default` 变量定义默认值，`PORT` 环境变量覆盖端口 |
 | `backend/gpu/types.go` | `GPUInfo`、`GPUProcess`、`SystemInfo`、`Snapshot` 数据结构 |
-| `backend/gpu/nvml.go` | CGO 封装：`Init()`/`Shutdown()` 生命周期，`GetAllGPUInfo()` 采集所有 GPU 指标（基础+高级）和进程；`parseThrottleReasons()` 解析时钟节流位掩码；`computeModeString()` 映射计算模式枚举 |
+| `backend/gpu/nvml.go` | CGO NVML 封装：`Init()`/`Shutdown()` 生命周期，`GetAllGPUInfo()` 采集所有 GPU 指标（基础+高级+DeviceQuery）和进程；`parseThrottleReasons()` 解析时钟节流位掩码；`computeModeString()` / `brandToString()` / `archToString()` 映射枚举 |
+| `backend/gpu/cuda.go` | CGO CUDA Driver API 封装：`CUDAInit()` 初始化，`getCUDAProps()` 通过 `cuDeviceGetAttribute()` 采集 SM 数量、L2 Cache、Thread 限制、Shared Memory、Warp Size、特性标志等 deviceQuery 属性 |
 | `backend/gpu/system.go` | 从 `/proc/stat` 和 `/proc/meminfo` 读取 CPU/内存（两次采样差值计算 CPU 使用率） |
 | `backend/api/handler.go` | `GET /api/gpus` REST 端点返回 JSON 快照 |
 | `backend/ws/hub.go` | WebSocket Hub：连接管理 + ticker 每秒采集广播；`readPump`/`writePump` goroutine 模式 |
@@ -50,13 +51,24 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 | I/O | NVLink 活动/最大链路数 | `nvmlDeviceGetNvLinkState` 遍历 |
 | Reliability | ECC 模式（Enabled/Disabled）、不可纠正 ECC 错误计数 | `nvmlDeviceGetEccMode` / `nvmlDeviceGetTotalEccErrors` |
 | Compute | 计算模式（Default/Exclusive/Prohibited） | `nvmlDeviceGetComputeMode` |
+| Device | CUDA Compute Capability（如 "8.9"）→ 前端 Device 属性条 | `nvmlDeviceGetCudaComputeCapability` |
+| Device | CUDA Cores 数量（如 16384）→ 前端 Device 属性条 | `nvmlDeviceGetNumGpuCores` |
+| Device | Max SM Clock (MHz) → 前端 Device 属性条 | `nvmlDeviceGetMaxClockInfo(NVML_CLOCK_SM)` |
+| Device | VBIOS 固件版本字符串 → 前端 Device 属性条 | `nvmlDeviceGetVbiosVersion` |
+| Device | GPU Brand（GeForce/Quadro/Tesla/NVIDIA RTX/…） | `nvmlDeviceGetBrand` + `brandToString()` |
+| Device | GPU 架构名（Kepler/Maxwell/Pascal/Volta/Turing/Ampere/Ada/Hopper/Blackwell） | `nvmlDeviceGetArchitecture` + `archToString()` |
+| Device | SM 数量、L2 Cache 大小 (KB)、Shared Memory/Block (KB)、Shared Memory/SM (KB) | `cuDeviceGetAttribute` (CUDA Driver API) |
+| Device | Register/Block、Max Threads/Block、Max Threads/SM、Warp Size | `cuDeviceGetAttribute` (CUDA Driver API) |
+| Device | Concurrent Kernels、Copy Engines、Compute Preemption | `cuDeviceGetAttribute` (CUDA Driver API) |
+| Device | Cooperative Launch、Multi-Device Coop、Managed Memory、UVA | `cuDeviceGetAttribute` (CUDA Driver API) |
+| Device | Integrated GPU、Kernel Execution Timeout | `cuDeviceGetAttribute` (CUDA Driver API) |
 
 ## 前端架构
 
 数据流：`useWebSocket()` composable → `GpuDashboard` 通过 `watch(data, ...)` 维护 `historyData` → 各子组件接收 props。
 
 - `GpuDashboard.vue` — 主面板：Header（驱动版本/CUDA 版本/连接状态）+ 系统信息区（CPU 环形仪表盘 + 内存仪表盘 + 每核心柱状图）+ GPU 卡片列表；用 `historyData` ref 为每个 GPU 累积最多 3600 个历史点
-- `GpuCard.vue` — GPU 卡片：摘要行 + 可展开四栏高级指标区（Performance/Memory/I/O/Reliability）+ 进程表。不可用的指标显示 `-`（通过 `dashNum`/`dashFmt` 辅助函数），让用户明确知道哪些数据未采集
+- `GpuCard.vue` — GPU 卡片：摘要行 + Device Specs 三栏网格（Compute/Memory Hierarchy/Capabilities：架构标签、CC、SMs、CUDA Cores、Max Clock、Warp Size、Thread 限制、L2 Cache、Shared Memory、Register、布尔特性标志）+ 可展开四栏高级指标区（Performance/Memory/I/O/Reliability）+ 进程表。不可用的指标显示 `-`（通过 `dashNum`/`dashFmt`/`boolIcon` 辅助函数），让用户明确知道哪些数据未采集
 - `CircularGauge.vue` — 纯 SVG 环形仪表盘，`stroke-dasharray`/`stroke-dashoffset` 驱动进度弧，颜色按阈值（≥90 红/≥60 黄/<60 绿）
 - `GpuLineChart.vue` — Chart.js 折线图（GPU%、Mem%、Temp°C、Mem Temp°C 四数据集，显存温度默认隐藏），watch history 更新时用 `chart.update('none')` 跳过动画
 - `ProcessTable.vue` — GPU 进程列表，按显存占用降序排列，类型标签（C=蓝色/G=紫色/C+G=青色）

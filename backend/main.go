@@ -38,6 +38,11 @@ func main() {
 		defer gpu.Shutdown()
 	}
 
+	// Initialize CUDA Driver API for device attribute queries
+	if err := gpu.CUDAInit(); err != nil {
+		log.Printf("WARNING: CUDA init failed: %v (device attributes unavailable)", err)
+	}
+
 	// Start WebSocket hub
 	hub := ws.NewHub(cfg.Monitor.PollIntervalSeconds)
 	hub.Start()

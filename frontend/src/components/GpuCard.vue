@@ -79,6 +79,51 @@
         <GpuLineChart :history="history" />
       </div>
 
+      <!-- Device Specs (deviceQuery-style static device properties) -->
+      <div class="border-t border-gray-100">
+        <div class="px-4 py-2 bg-gray-50/50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Device Specs</span>
+          <span v-if="gpu.architecture" class="arch-badge" :class="archClass(gpu.architecture)">{{ gpu.architecture }}</span>
+          <span class="text-[11px] text-gray-400">· CC {{ gpu.compute_capability || '-' }}</span>
+          <span class="text-[11px] text-gray-400 hidden sm:inline">· VBIOS {{ gpu.vbios_version || '-' }}</span>
+          <span v-if="gpu.brand" class="text-[11px] text-gray-400 hidden sm:inline">· {{ gpu.brand }}</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+          <!-- Compute -->
+          <div class="p-3 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span class="text-gray-400">SMs</span><span class="font-mono font-medium">{{ dashNum(gpu.sms, '') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">CUDA Cores</span><span class="font-mono font-medium">{{ dashNum(gpu.num_cores, '') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Cores / SM</span><span class="font-mono font-medium">{{ gpu.sms && gpu.num_cores ? Math.round(gpu.num_cores / gpu.sms) : '-' }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Max Clock</span><span class="font-mono font-medium">{{ dashNum(gpu.max_sm_clock_mhz, ' MHz') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Warp Size</span><span class="font-mono font-medium">{{ dashNum(gpu.warp_size, '') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Max Thr / Block</span><span class="font-mono font-medium">{{ dashNum(gpu.max_threads_per_block, '') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Max Thr / SM</span><span class="font-mono font-medium">{{ dashNum(gpu.max_threads_per_sm, '') }}</span></div>
+          </div>
+          <!-- Memory Hierarchy -->
+          <div class="p-3 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span class="text-gray-400">L2 Cache</span><span class="font-mono font-medium">{{ dashFmt(gpu.l2_cache_size_kb, formatL2Cache) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">ShMem / Block</span><span class="font-mono font-medium">{{ dashNum(gpu.shared_mem_per_block_kb, ' KB') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">ShMem / SM</span><span class="font-mono font-medium">{{ dashNum(gpu.shared_mem_per_sm_kb, ' KB') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Regs / Block</span><span class="font-mono font-medium">{{ dashNum(gpu.registers_per_block, '') }}</span></div>
+            <!-- Memory bandwidth summary -->
+            <div class="flex justify-between"><span class="text-gray-400">Mem Bus</span><span class="font-mono font-medium">{{ dashNum(gpu.memory_bus_width, '-bit') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Max BW</span><span class="font-mono font-medium">{{ dashFmt(gpu.memory_bandwidth_gbps, formatBandwidth) }}</span></div>
+          </div>
+          <!-- Capabilities -->
+          <div class="p-3 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span class="text-gray-400">Concurrent Kernels</span><span class="font-mono" :class="gpu.concurrent_kernels ? 'text-green-600' : 'text-gray-300'">{{ boolIcon(gpu.concurrent_kernels) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Copy Engines</span><span class="font-mono font-medium">{{ dashNum(gpu.copy_engines, '') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Preemption</span><span class="font-mono" :class="gpu.compute_preemption ? 'text-green-600' : 'text-gray-300'">{{ boolIcon(gpu.compute_preemption) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Cooperative Launch</span><span class="font-mono" :class="gpu.cooperative_launch ? 'text-green-600' : 'text-gray-300'">{{ boolIcon(gpu.cooperative_launch) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Multi-Device Coop</span><span class="font-mono" :class="gpu.cooperative_multi_dev ? 'text-green-600' : 'text-gray-300'">{{ boolIcon(gpu.cooperative_multi_dev) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">UVA</span><span class="font-mono" :class="gpu.unified_addressing ? 'text-green-600' : 'text-gray-300'">{{ boolIcon(gpu.unified_addressing) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Managed Memory</span><span class="font-mono" :class="gpu.managed_memory ? 'text-green-600' : 'text-gray-300'">{{ boolIcon(gpu.managed_memory) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Kernel Timeout</span><span class="font-mono" :class="gpu.kernel_timeout ? 'text-yellow-600' : 'text-gray-300'">{{ boolIcon(gpu.kernel_timeout) }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Integrated</span><span class="font-mono" :class="gpu.integrated ? 'text-yellow-600' : 'text-gray-400'">{{ gpu.integrated ? 'Yes' : 'No' }}</span></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Advanced Metrics: 4-column grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 border-t border-gray-100 divide-y md:divide-y-0 md:divide-x divide-gray-100">
 
@@ -306,5 +351,33 @@ function throttleClass(reason) {
   if (reason.includes('Thermal')) return 'throttle-thermal'
   if (reason.includes('Power') || reason.includes('Brake')) return 'throttle-power'
   return 'throttle-other'
+}
+
+// Architecture badge color
+function archClass(arch) {
+  const a = arch.toLowerCase()
+  if (a.includes('blackwell')) return 'arch-blackwell'
+  if (a.includes('hopper')) return 'arch-hopper'
+  if (a.includes('ada')) return 'arch-ada'
+  if (a.includes('ampere')) return 'arch-ampere'
+  if (a.includes('turing')) return 'arch-turing'
+  if (a.includes('volta')) return 'arch-volta'
+  if (a.includes('pascal')) return 'arch-pascal'
+  if (a.includes('maxwell')) return 'arch-maxwell'
+  if (a.includes('kepler')) return 'arch-kepler'
+  return 'arch-other'
+}
+
+// Boolean icon: ✓ for true, ✗ for false (when CUDA unavailable, false → ✗ is acceptable)
+function boolIcon(val) {
+  return val ? '✓' : '✗'
+}
+
+// L2 cache formatting (KB → MB if >= 1024)
+function formatL2Cache(kb) {
+  if (!kb) return ''
+  if (kb >= 1048576) return (kb / 1048576).toFixed(1) + ' GB'
+  if (kb >= 1024) return (kb / 1024).toFixed(0) + ' MB'
+  return kb.toFixed(0) + ' KB'
 }
 </script>

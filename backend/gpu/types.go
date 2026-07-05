@@ -41,6 +41,33 @@ type GPUInfo struct {
 	ComputeMode              string   `json:"compute_mode"`
 	NVLinkActiveLinks        int      `json:"nvlink_active_links"`
 	NVLinkMaxLinks           int      `json:"nvlink_max_links"`
+
+	// DeviceQuery-style static device properties
+	ComputeCapability string `json:"compute_capability"` // e.g. "8.9"
+	NumCores          int    `json:"num_cores"`          // CUDA cores count
+	MaxSMClockMHz     int    `json:"max_sm_clock_mhz"`   // max SM clock frequency
+	VBIOSVersion      string `json:"vbios_version"`      // VBIOS firmware version
+	Brand             string `json:"brand"`              // GPU brand: GeForce/Quadro/Tesla/NVIDIA RTX/...
+	Architecture      string `json:"architecture"`       // Architecture name: Blackwell/Ada/Hopper/...
+
+	// CUDA Driver API device attributes (training/inference optimization reference)
+	SMs                 int  `json:"sms"`                    // SM (Streaming Multiprocessor) count
+	L2CacheSizeKB       int  `json:"l2_cache_size_kb"`      // L2 cache size
+	SharedMemPerBlockKB int  `json:"shared_mem_per_block_kb"` // Shared memory per block (default)
+	SharedMemPerSMKB    int  `json:"shared_mem_per_sm_kb"`    // Shared memory per SM
+	RegistersPerBlock   int  `json:"registers_per_block"`     // Max registers per block
+	MaxThreadsPerBlock  int  `json:"max_threads_per_block"`   // Max threads per block
+	MaxThreadsPerSM     int  `json:"max_threads_per_sm"`      // Max threads per SM
+	WarpSize            int  `json:"warp_size"`               // Warp size (always 32 on NVIDIA)
+	ConcurrentKernels   bool `json:"concurrent_kernels"`      // Concurrent kernel execution
+	CopyEngines         int  `json:"copy_engines"`            // Async copy engine count
+	ComputePreemption   bool `json:"compute_preemption"`      // Compute preemption support
+	CooperativeLaunch   bool `json:"cooperative_launch"`      // Cooperative kernel launch
+	CooperativeMultiDev bool `json:"cooperative_multi_dev"`   // Multi-device cooperative launch
+	ManagedMemory       bool `json:"managed_memory"`          // Managed memory support
+	UnifiedAddressing   bool `json:"unified_addressing"`      // Unified virtual addressing
+	Integrated          bool `json:"integrated"`              // Integrated GPU (vs discrete)
+	KernelTimeout       bool `json:"kernel_timeout"`          // Kernel execution timeout
 }
 
 // GPUProcess holds information about a process running on a GPU
