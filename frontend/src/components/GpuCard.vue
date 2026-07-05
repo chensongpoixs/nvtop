@@ -119,7 +119,12 @@
               <span class="text-gray-400">Bus Width</span>
               <span class="font-mono">{{ dashNum(gpu.memory_bus_width, ' bit') }}</span>
             </div>
-            <!-- Theoretical Bandwidth -->
+            <!-- Current DRAM Bandwidth -->
+            <div class="flex justify-between py-1 border-b border-gray-50">
+              <span class="text-gray-400">DRAM BW</span>
+              <span class="font-mono">{{ dashFmt(gpu.memory_bandwidth_current_gbps, formatBandwidth) }}</span>
+            </div>
+            <!-- Max Theoretical Bandwidth -->
             <div class="flex justify-between py-1 border-b border-gray-50">
               <span class="text-gray-400">Max BW</span>
               <span class="font-mono">{{ dashFmt(gpu.memory_bandwidth_gbps, formatBandwidth) }}</span>

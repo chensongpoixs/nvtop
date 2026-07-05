@@ -242,7 +242,11 @@ func getGPUInfo(index int) (GPUInfo, error) {
 	if result := C.nvmlDeviceGetMaxClockInfo(device, C.NVML_CLOCK_MEM, &maxMemClock); result == C.NVML_SUCCESS {
 		info.MaxMemoryClockMHz = int(maxMemClock)
 	}
-	// Theoretical memory bandwidth: width(bits) × clock(MHz) × 2(DDR) / 8(bytes) / 1000(→GB/s)
+	// Current memory bandwidth: width(bits) × current_clock(MHz) × 2(DDR) / 8(bytes) / 1000(→GB/s)
+	if info.MemoryBusWidth > 0 && info.ClockMemoryMHz > 0 {
+		info.MemoryBandwidthCurrentGBps = float64(info.MemoryBusWidth) * float64(info.ClockMemoryMHz) * 2 / 8 / 1000
+	}
+	// Max theoretical memory bandwidth: width(bits) × max_clock(MHz) × 2 / 8 / 1000
 	if info.MemoryBusWidth > 0 && info.MaxMemoryClockMHz > 0 {
 		info.MemoryBandwidthGBps = float64(info.MemoryBusWidth) * float64(info.MaxMemoryClockMHz) * 2 / 8 / 1000
 	}

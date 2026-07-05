@@ -43,8 +43,8 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 | Performance | P-State (P0~P15)、GPU 运行模式 | `nvmlDeviceGetPerformanceState` |
 | Performance | 时钟节流原因（位掩码→文本列表：Thermal/Power/Idle 等 10 种） | `nvmlDeviceGetCurrentClocksThrottleReasons` |
 | Memory | 显存总线位宽 (bits)、最大显存时钟 (MHz) | `nvmlDeviceGetMemoryBusWidth` / `nvmlDeviceGetMaxClockInfo` |
-| Memory | 理论显存带宽 (GB/s) = width × clock × 2 / 8 / 1000 | 计算得出 |
-| Memory | HBM 显存热点温度 | `nvmlDeviceGetTemperature(NVML_TEMPERATURE_MEMORY)` |
+| Memory | 当前显存带宽 + 理论最大带宽 (GB/s) = width × clock × 2 / 8 / 1000 | 计算得出（当前用 `clock_memory_mhz`，最大用 `max_memory_clock_mhz`） |
+| Memory | HBM 显存热点温度 | `nvmlDeviceGetFieldValues` (fieldId=195) |
 | Memory | BAR1 内存（PCIe BAR，用于 CUDA UVM） | `nvmlDeviceGetBAR1MemoryInfo` |
 | I/O | PCIe 链路协商速率（当前+最大 Gen×Width） | `nvmlDeviceGetCurrPcieLinkGeneration/Width` + Max 版本 |
 | I/O | NVLink 活动/最大链路数 | `nvmlDeviceGetNvLinkState` 遍历 |

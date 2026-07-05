@@ -32,7 +32,8 @@ type GPUInfo struct {
 	PerformanceState         int      `json:"performance_state"`
 	MemoryBusWidth           int      `json:"memory_bus_width"`
 	MaxMemoryClockMHz        int      `json:"max_memory_clock_mhz"`
-	MemoryBandwidthGBps      float64  `json:"memory_bandwidth_gbps"`
+	MemoryBandwidthCurrentGBps float64 `json:"memory_bandwidth_current_gbps"` // 当前运行时带宽
+	MemoryBandwidthGBps      float64  `json:"memory_bandwidth_gbps"`          // 理论最大带宽
 	BAR1TotalMB              uint64   `json:"bar1_total_mb"`
 	BAR1UsedMB               uint64   `json:"bar1_used_mb"`
 	ECCMode                  string   `json:"ecc_mode"`
@@ -52,11 +53,12 @@ type GPUProcess struct {
 
 // SystemInfo holds CPU and memory usage information
 type SystemInfo struct {
-	CPUUsagePercent    float64  `json:"cpu_usage_percent"`
+	CPUUsagePercent    float64   `json:"cpu_usage_percent"`
 	CPUPerCorePercent  []float64 `json:"cpu_per_core_percent"`
-	MemoryTotalMB      uint64   `json:"memory_total_mb"`
-	MemoryUsedMB       uint64   `json:"memory_used_mb"`
-	MemoryUsagePercent float64  `json:"memory_usage_percent"`
+	CPUTemperatureC    float64   `json:"cpu_temperature_c"` // CPU 封装温度
+	MemoryTotalMB      uint64    `json:"memory_total_mb"`
+	MemoryUsedMB       uint64    `json:"memory_used_mb"`
+	MemoryUsagePercent float64   `json:"memory_usage_percent"`
 }
 
 // Snapshot is the complete data payload sent to clients

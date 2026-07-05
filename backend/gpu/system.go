@@ -28,6 +28,7 @@ func GetSystemInfo() SystemInfo {
 	if memTotal > 0 {
 		info.MemoryUsagePercent = float64(memTotal-memAvailable) / float64(memTotal) * 100
 	}
+	info.CPUTemperatureC = getCPUTemperature()
 
 	return info
 }
@@ -127,4 +128,57 @@ func parseMemValue(line string) uint64 {
 	}
 	v, _ := strconv.ParseUint(fields[1], 10, 64)
 	return v
+}
+
+// getCPUTemperature reads CPU package temperature from hwmon sensors.
+// Returns 0 if no CPU temperature sensor is found.
+func getCPUTemperature() float64 {
+	hwmonDir := "/sys/class/hwmon"
+	entries, err := os.ReadDir(hwmonDir)
+	if err != nil {
+		return 0
+	}
+
+	// Priority order for sensor label matching
+	cpuLabels := []string{"Tctl", "Tdie", "Package id 0", "CPU", "Core 0"}
+
+	for _, entry := range entries {
+		base := hwmonDir + "/" + entry.Name()
+		// Read all temp*_label files
+		for i := 1; i <= 10; i++ {
+			labelPath := base + "/temp" + strconv.Itoa(i) + "_label"
+			labelData, err := os.ReadFile(labelPath)
+			if err != nil {
+				continue
+			}
+			label := strings.TrimSpace(string(labelData))
+
+			// Check if this sensor matches CPU-related labels
+			matched := false
+			for _, cpuLabel := range cpuLabels {
+				if strings.Contains(label, cpuLabel) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+
+			// Read the corresponding temp*_input (millidegrees Celsius)
+			inputPath := base + "/temp" + strconv.Itoa(i) + "_input"
+			inputData, err := os.ReadFile(inputPath)
+			if err != nil {
+				continue
+			}
+			val, err := strconv.ParseFloat(strings.TrimSpace(string(inputData)), 64)
+			if err != nil {
+				continue
+			}
+			// Convert millidegrees to degrees Celsius
+			return val / 1000.0
+		}
+	}
+
+	return 0
 }

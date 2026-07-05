@@ -30,7 +30,7 @@
     <section class="mb-6" v-if="snapshot?.system">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- CPU Overall Gauge -->
-        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col items-center">
           <CircularGauge
             :value="snapshot.system.cpu_usage_percent"
             :max="100"
@@ -38,6 +38,12 @@
             :sub-label="snapshot.system.cpu_per_core_percent?.length + ' cores'"
             unit="%"
           />
+          <div class="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100 w-full justify-center">
+            <span class="text-[10px] text-gray-400">Temp</span>
+            <span class="text-sm font-bold tabular-nums" :class="snapshot.system.cpu_temperature_c ? tempColor(snapshot.system.cpu_temperature_c) : 'text-gray-400'">
+              {{ snapshot.system.cpu_temperature_c ? snapshot.system.cpu_temperature_c.toFixed(0) + '°C' : '-' }}
+            </span>
+          </div>
         </div>
 
         <!-- Memory Gauge -->
@@ -145,5 +151,11 @@ function usageBarColor(pct) {
   if (pct >= 90) return 'bg-red-500'
   if (pct >= 60) return 'bg-yellow-500'
   return 'bg-green-500'
+}
+
+function tempColor(c) {
+  if (c >= 80) return 'temp-high'
+  if (c >= 60) return 'temp-warm'
+  return 'temp-normal'
 }
 </script>
