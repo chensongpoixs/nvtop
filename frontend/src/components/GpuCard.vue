@@ -31,11 +31,11 @@
         :size="90"
       />
 
-      <!-- Memory Gauge -->
+      <!-- Memory Controller Gauge -->
       <CircularGauge
         :value="gpu.utilization_memory"
         :max="100"
-        label="Memory"
+        label="Mem Ctrl"
         :sub-label="formatMB(gpu.memory_used_mb) + '/' + formatMB(gpu.memory_total_mb)"
         unit="%"
         :size="90"
@@ -114,6 +114,11 @@
         <div class="p-4">
           <h4 class="text-xs font-medium text-gray-500 uppercase mb-3">Memory</h4>
           <div class="space-y-2 text-xs">
+            <!-- Memory Controller Utilization -->
+            <div class="flex justify-between py-1 border-b border-gray-50">
+              <span class="text-gray-400">Mem Controller</span>
+              <span class="font-mono" :class="usageColor(gpu.utilization_memory)">{{ gpu.utilization_memory }}%</span>
+            </div>
             <!-- Memory Bus Width -->
             <div class="flex justify-between py-1 border-b border-gray-50">
               <span class="text-gray-400">Bus Width</span>
