@@ -45,6 +45,7 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 | Performance | 时钟节流原因（位掩码→文本列表：Thermal/Power/Idle 等 10 种） | `nvmlDeviceGetCurrentClocksThrottleReasons` |
 | Memory | 显存总线位宽 (bits)、最大显存时钟 (MHz) | `nvmlDeviceGetMemoryBusWidth` / `nvmlDeviceGetMaxClockInfo` |
 | Memory | 当前显存带宽 + 理论最大带宽 (GB/s) = width × clock × 2 / 8 / 1000 | 计算得出（当前用 `clock_memory_mhz`，最大用 `max_memory_clock_mhz`） |
+| Memory | 估算实时显存吞吐量 (GB/s) = 显存控制器利用率% × 当前理论最大带宽 | 前端计算（`estimatedDRAMBW`），摘要行 Mem Ctrl gauge 下方蓝色字体 + Memory 栏 DRAM Throughput 进度条 |
 | Memory | HBM 显存热点温度 | `nvmlDeviceGetFieldValues` (fieldId=195) |
 | Memory | BAR1 内存（PCIe BAR，用于 CUDA UVM） | `nvmlDeviceGetBAR1MemoryInfo` |
 | I/O | PCIe 链路协商速率（当前+最大 Gen×Width） | `nvmlDeviceGetCurrPcieLinkGeneration/Width` + Max 版本 |
@@ -69,7 +70,7 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 数据流：`useWebSocket()` composable → `GpuDashboard` 通过 `watch(data, ...)` 维护 `historyData` → 各子组件接收 props。
 
 - `GpuDashboard.vue` — 主面板：Header（驱动版本/CUDA 版本/连接状态）+ 系统信息区（CPU 环形仪表盘 + 内存仪表盘 + 每核心柱状图）+ GPU 卡片列表；用 `historyData` ref 为每个 GPU 累积最多 3600 个历史点
-- `GpuCard.vue` — GPU 卡片：摘要行 + Device Specs 三栏网格（Compute/Memory Hierarchy/Capabilities：架构标签、CC、SMs、CUDA Cores、Max Clock、Warp Size、Thread 限制、L2 Cache、Shared Memory、Register、布尔特性标志）+ 可展开四栏高级指标区（Performance/Memory/I/O/Reliability）+ 进程表。不可用的指标显示 `-`（通过 `dashNum`/`dashFmt`/`boolIcon` 辅助函数），让用户明确知道哪些数据未采集
+- `GpuCard.vue` — GPU 卡片：摘要行 7 列（GPU 仪表盘 + 显存控制器仪表盘含实时估算吞吐量 + 温度 + 功耗 + 风扇 + Core/Mem 时钟含最大带宽参考 + PCIe I/O 实时吞吐量 RX/TX 按活跃度着色）+ Device Specs 三栏网格（Compute/Memory Hierarchy/Capabilities：架构标签、CC、SMs、CUDA Cores、Max Clock、Warp Size、Thread 限制、L2 Cache、Shared Memory、Register、布尔特性标志）+ 可展开四栏高级指标区（Performance/Memory/I/O/Reliability，Memory 栏含 DRAM Throughput 进度条显示估算实时吞吐量/最大带宽占比）+ 进程表。不可用的指标显示 `-`（通过 `dashNum`/`dashFmt`/`boolIcon` 辅助函数），让用户明确知道哪些数据未采集。估算实时显存吞吐量 = 显存控制器利用率% × 当前理论最大带宽（NVML 无直接 DRAM 吞吐量 API，此公式为业界通用近似）。PCIe 吞吐量来自 `nvmlDeviceGetPcieThroughput`（RX/TX KB/s → Mbps），前端 `formatPCIeBW()` 转换为 GB/s 或 MB/s 显示
 - `CircularGauge.vue` — 纯 SVG 环形仪表盘，`stroke-dasharray`/`stroke-dashoffset` 驱动进度弧，颜色按阈值（≥90 红/≥60 黄/<60 绿）
 - `GpuLineChart.vue` — Chart.js 折线图（GPU%、Mem%、Temp°C、Mem Temp°C 四数据集，显存温度默认隐藏），watch history 更新时用 `chart.update('none')` 跳过动画
 - `ProcessTable.vue` — GPU 进程列表，按显存占用降序排列，类型标签（C=蓝色/G=紫色/C+G=青色）

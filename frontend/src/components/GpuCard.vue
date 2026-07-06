@@ -21,7 +21,7 @@
     </div>
 
     <!-- Summary metrics row with circular gauges -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 border-b border-gray-100">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 p-4 border-b border-gray-100">
       <!-- GPU Utilization Gauge -->
       <CircularGauge
         :value="gpu.utilization_gpu"
@@ -32,14 +32,19 @@
       />
 
       <!-- Memory Controller Gauge -->
-      <CircularGauge
-        :value="gpu.utilization_memory"
-        :max="100"
-        label="Mem Ctrl"
-        :sub-label="formatMB(gpu.memory_used_mb) + '/' + formatMB(gpu.memory_total_mb)"
-        unit="%"
-        :size="90"
-      />
+      <div class="flex flex-col items-center justify-center">
+        <CircularGauge
+          :value="gpu.utilization_memory"
+          :max="100"
+          label="Mem Ctrl"
+          :sub-label="formatMB(gpu.memory_used_mb) + '/' + formatMB(gpu.memory_total_mb)"
+          unit="%"
+          :size="90"
+        />
+        <div class="text-[10px] text-blue-600 font-mono mt-0.5 tabular-nums" :class="estimatedDRAMBW ? '' : 'text-gray-300'">
+          {{ estimatedDRAMBW ? formatBandwidth(estimatedDRAMBW) : '-' }}
+        </div>
+      </div>
 
       <!-- Temperature -->
       <div class="flex flex-col items-center justify-center">
@@ -62,16 +67,29 @@
         <span class="text-[11px] text-gray-500 font-medium">Fan</span>
       </div>
 
-      <!-- Clocks + DRAM Bandwidth -->
+      <!-- Clocks -->
       <div class="flex flex-col items-center justify-center">
         <div class="text-sm font-bold tabular-nums">
           <div>{{ gpu.clock_core_mhz }}<span class="text-xs">MHz</span></div>
           <div class="text-gray-400">{{ gpu.clock_memory_mhz }}<span class="text-xs">MHz</span></div>
-          <div class="text-blue-600" :class="gpu.memory_bandwidth_current_gbps ? '' : 'text-gray-300'">
-            {{ dashFmt(gpu.memory_bandwidth_current_gbps, formatBandwidth) || '-' }}
+          <div class="text-[10px] text-gray-400 mt-0.5">{{ dashFmt(gpu.memory_bandwidth_current_gbps, formatBandwidth) || '-' }} max</div>
+        </div>
+        <span class="text-[11px] text-gray-500 font-medium">Core/Mem</span>
+      </div>
+
+      <!-- PCIe I/O Throughput -->
+      <div class="flex flex-col items-center justify-center">
+        <div class="text-xs font-bold tabular-nums space-y-0.5">
+          <div :class="pcieRXColor">
+            <span class="text-[10px] text-gray-400">RX</span>
+            {{ formatPCIeBW(gpu.pcie_rx_mbps) }}
+          </div>
+          <div :class="pcieTXColor">
+            <span class="text-[10px] text-gray-400">TX</span>
+            {{ formatPCIeBW(gpu.pcie_tx_mbps) }}
           </div>
         </div>
-        <span class="text-[11px] text-gray-500 font-medium">Core/Mem/BW</span>
+        <span class="text-[11px] text-gray-500 font-medium">PCIe I/O</span>
       </div>
     </div>
 
@@ -166,6 +184,20 @@
             <div class="flex justify-between py-1 border-b border-gray-50">
               <span class="text-gray-400">Mem Controller</span>
               <span class="font-mono" :class="usageColor(gpu.utilization_memory)">{{ gpu.utilization_memory }}%</span>
+            </div>
+            <!-- DRAM Throughput (estimated real-time) -->
+            <div>
+              <span class="text-gray-400 block mb-1">DRAM Throughput</span>
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="h-2 rounded-full transition-all duration-500"
+                  :class="dramThroughputRatio > 80 ? 'bg-red-500' : dramThroughputRatio > 50 ? 'bg-yellow-500' : 'bg-blue-500'"
+                  :style="{ width: Math.min(dramThroughputRatio, 100) + '%' }">
+                </div>
+              </div>
+              <span class="text-[10px] text-gray-400 mt-0.5">
+                {{ estimatedDRAMBW ? formatBandwidth(estimatedDRAMBW) : '-' }}
+                <template v-if="estimatedDRAMBW && gpu.memory_bandwidth_current_gbps"> / {{ formatBandwidth(gpu.memory_bandwidth_current_gbps) }} max</template>
+              </span>
             </div>
             <!-- Memory Bus Width -->
             <div class="flex justify-between py-1 border-b border-gray-50">
@@ -304,6 +336,32 @@ const pcieDegraded = computed(() => {
      props.gpu.pcie_current_width < props.gpu.pcie_max_width)
 })
 
+// Estimated real-time DRAM throughput: mem controller utilization × current max bandwidth
+const estimatedDRAMBW = computed(() => {
+  if (!props.gpu.memory_bandwidth_current_gbps || !props.gpu.utilization_memory) return 0
+  return (props.gpu.utilization_memory / 100) * props.gpu.memory_bandwidth_current_gbps
+})
+
+// DRAM throughput ratio: estimated throughput / max bandwidth × 100
+const dramThroughputRatio = computed(() => {
+  if (!estimatedDRAMBW.value || !props.gpu.memory_bandwidth_current_gbps) return 0
+  return (estimatedDRAMBW.value / props.gpu.memory_bandwidth_current_gbps) * 100
+})
+
+// PCIe I/O throughput colors (activity-based)
+const pcieRXColor = computed(() => {
+  if (!props.gpu.pcie_rx_mbps) return 'text-gray-300'
+  if (props.gpu.pcie_rx_mbps > 50000) return 'text-green-600'
+  if (props.gpu.pcie_rx_mbps > 10000) return 'text-blue-600'
+  return 'text-gray-600'
+})
+const pcieTXColor = computed(() => {
+  if (!props.gpu.pcie_tx_mbps) return 'text-gray-300'
+  if (props.gpu.pcie_tx_mbps > 50000) return 'text-green-600'
+  if (props.gpu.pcie_tx_mbps > 10000) return 'text-blue-600'
+  return 'text-gray-600'
+})
+
 // Formatting
 function dashNum(val, suffix = '') {
   if (!val && val !== 0) return '-'
@@ -327,6 +385,14 @@ function formatBandwidth(gbps) {
   if (!gbps) return ''
   if (gbps >= 1000) return (gbps / 1000).toFixed(2) + ' TB/s'
   return gbps.toFixed(0) + ' GB/s'
+}
+
+// Convert PCIe throughput from Mbps to human-readable (GB/s or MB/s)
+function formatPCIeBW(mbps) {
+  if (!mbps) return '-'
+  if (mbps >= 8000) return (mbps / 8000).toFixed(1) + ' GB/s'
+  if (mbps >= 8) return (mbps / 8).toFixed(0) + ' MB/s'
+  return mbps.toFixed(0) + ' Mbps'
 }
 
 // Colors
