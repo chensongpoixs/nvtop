@@ -29,7 +29,7 @@ cd frontend && npm install && npm run dev  # 前端开发模式（Vite HMR，代
 | `backend/gpu/types.go` | `GPUInfo`、`GPUProcess`、`SystemInfo`、`Snapshot` 数据结构 |
 | `backend/gpu/nvml.go` | CGO NVML 封装：`Init()`/`Shutdown()` 生命周期，`GetAllGPUInfo()` 采集所有 GPU 指标（基础+高级+DeviceQuery）和进程；`parseThrottleReasons()` 解析时钟节流位掩码；`computeModeString()` / `brandToString()` / `archToString()` 映射枚举 |
 | `backend/gpu/cuda.go` | CGO CUDA Driver API 封装：`CUDAInit()` 初始化，`getCUDAProps()` 通过 `cuDeviceGetAttribute()` 采集 SM 数量、L2 Cache、Thread 限制、Shared Memory、Warp Size、特性标志等 deviceQuery 属性；`coresPerSM()` 按 CC 查表（CC→cores/SM），用于 NVML `nvmlDeviceGetNumGpuCores` 不支持的 GPU（如 Blackwell）回退计算 CUDA Cores = SMs × coresPerSM |
-| `backend/gpu/system.go` | 从 `/proc/stat` 和 `/proc/meminfo` 读取 CPU/内存（两次采样差值计算 CPU 使用率） |
+| `backend/gpu/system.go` | 从 `/proc/stat` 和 `/proc/meminfo` 读取 CPU/内存（两次采样差值计算 CPU 使用率）；CPU 温度双路径采集：优先 hwmon（`/sys/class/hwmon/hwmon*/temp*_label` 标签匹配 AMD Tctl/Tdie + Intel Package/Core + generic CPU），回退 thermal_zone（`/sys/class/thermal/thermal_zone*/` x86_pkg_temp/acpitz） |
 | `backend/api/handler.go` | `GET /api/gpus` REST 端点返回 JSON 快照 |
 | `backend/ws/hub.go` | WebSocket Hub：连接管理 + ticker 每秒采集广播；`readPump`/`writePump` goroutine 模式 |
 

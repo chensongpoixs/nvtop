@@ -130,33 +130,74 @@ func parseMemValue(line string) uint64 {
 	return v
 }
 
-// getCPUTemperature reads CPU package temperature from hwmon sensors.
-// Returns 0 if no CPU temperature sensor is found.
+// getCPUTemperature reads CPU package temperature from hwmon or thermal_zone sensors.
+// Tries hwmon first (label-based matching, most precise), then falls back to
+// thermal_zone (x86_pkg_temp on Intel, acpitz on others). Returns 0 if no CPU
+// temperature sensor is found.
 func getCPUTemperature() float64 {
+	// --- Path 1: /sys/class/hwmon (label-based, most precise) ---
+	if t := readHwmonCPUTemp(); t > 0 {
+		return t
+	}
+
+	// --- Path 2: /sys/class/thermal (Intel x86_pkg_temp / generic thermal zones) ---
+	if t := readThermalCPUTemp(); t > 0 {
+		return t
+	}
+
+	return 0
+}
+
+// readHwmonCPUTemp scans /sys/class/hwmon/hwmon*/temp*_label for CPU sensors.
+func readHwmonCPUTemp() float64 {
 	hwmonDir := "/sys/class/hwmon"
 	entries, err := os.ReadDir(hwmonDir)
 	if err != nil {
 		return 0
 	}
 
-	// Priority order for sensor label matching
-	cpuLabels := []string{"Tctl", "Tdie", "Package id 0", "CPU", "Core 0"}
+	// Broad label matching for CPU package / core temperature sensors.
+	// Case-insensitive Contains match — covers AMD (Tctl/Tdie), Intel (Package id 0,
+	// Core 0, Tcc), and generic (CPU, coretemp) naming conventions.
+	cpuLabels := []string{
+		"Tctl", "Tdie", "Tccd",          // AMD
+		"Package", "Core ", "Tcc",        // Intel
+		"CPU", "coretemp", "k10temp",    // generic / driver names
+	}
 
 	for _, entry := range entries {
 		base := hwmonDir + "/" + entry.Name()
-		// Read all temp*_label files
-		for i := 1; i <= 10; i++ {
+
+		// First, check the hwmon name (driver name like "coretemp", "k10temp")
+		namePath := base + "/name"
+		if nameData, err := os.ReadFile(namePath); err == nil {
+			name := strings.ToLower(strings.TrimSpace(string(nameData)))
+			for _, label := range cpuLabels {
+				if strings.Contains(name, strings.ToLower(label)) {
+					// This entire hwmon is a CPU sensor — read temp1_input directly
+					inputPath := base + "/temp1_input"
+					if inputData, err := os.ReadFile(inputPath); err == nil {
+						if val, err := strconv.ParseFloat(strings.TrimSpace(string(inputData)), 64); err == nil {
+							return val / 1000.0
+						}
+					}
+				}
+			}
+		}
+
+		// Scan temp*_label files (up to 32 sensors per hwmon)
+		for i := 1; i <= 32; i++ {
 			labelPath := base + "/temp" + strconv.Itoa(i) + "_label"
 			labelData, err := os.ReadFile(labelPath)
 			if err != nil {
 				continue
 			}
 			label := strings.TrimSpace(string(labelData))
+			lower := strings.ToLower(label)
 
-			// Check if this sensor matches CPU-related labels
 			matched := false
 			for _, cpuLabel := range cpuLabels {
-				if strings.Contains(label, cpuLabel) {
+				if strings.Contains(lower, strings.ToLower(cpuLabel)) {
 					matched = true
 					break
 				}
@@ -165,7 +206,7 @@ func getCPUTemperature() float64 {
 				continue
 			}
 
-			// Read the corresponding temp*_input (millidegrees Celsius)
+			// Read corresponding temp*_input (millidegrees Celsius)
 			inputPath := base + "/temp" + strconv.Itoa(i) + "_input"
 			inputData, err := os.ReadFile(inputPath)
 			if err != nil {
@@ -175,10 +216,55 @@ func getCPUTemperature() float64 {
 			if err != nil {
 				continue
 			}
-			// Convert millidegrees to degrees Celsius
 			return val / 1000.0
 		}
 	}
-
 	return 0
+}
+
+// readThermalCPUTemp scans /sys/class/thermal/thermal_zone*/ for CPU temperature.
+// Falls back to the first readable thermal zone if no x86_pkg_temp is found.
+func readThermalCPUTemp() float64 {
+	thermalDir := "/sys/class/thermal"
+	entries, err := os.ReadDir(thermalDir)
+	if err != nil {
+		return 0
+	}
+
+	var fallbackTemp float64
+
+	for _, entry := range entries {
+		base := thermalDir + "/" + entry.Name()
+
+		// Read type to identify CPU thermal zone
+		typePath := base + "/type"
+		typeData, err := os.ReadFile(typePath)
+		if err != nil {
+			continue
+		}
+		zoneType := strings.ToLower(strings.TrimSpace(string(typeData)))
+
+		// Read temperature (millidegrees Celsius)
+		tempPath := base + "/temp"
+		tempData, err := os.ReadFile(tempPath)
+		if err != nil {
+			continue
+		}
+		val, err := strconv.ParseFloat(strings.TrimSpace(string(tempData)), 64)
+		if err != nil {
+			continue
+		}
+
+		// Intel: x86_pkg_temp — CPU package temperature
+		if strings.Contains(zoneType, "x86_pkg_temp") || strings.Contains(zoneType, "pkg_temp") {
+			return val / 1000.0
+		}
+
+		// ACPI thermal zone — use as fallback (often the CPU/package zone)
+		if strings.Contains(zoneType, "acpitz") && fallbackTemp == 0 {
+			fallbackTemp = val / 1000.0
+		}
+	}
+
+	return fallbackTemp
 }
