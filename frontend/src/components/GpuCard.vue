@@ -62,13 +62,16 @@
         <span class="text-[11px] text-gray-500 font-medium">Fan</span>
       </div>
 
-      <!-- Clocks -->
+      <!-- Clocks + DRAM Bandwidth -->
       <div class="flex flex-col items-center justify-center">
         <div class="text-sm font-bold tabular-nums">
           <div>{{ gpu.clock_core_mhz }}<span class="text-xs">MHz</span></div>
           <div class="text-gray-400">{{ gpu.clock_memory_mhz }}<span class="text-xs">MHz</span></div>
+          <div class="text-blue-600" :class="gpu.memory_bandwidth_current_gbps ? '' : 'text-gray-300'">
+            {{ dashFmt(gpu.memory_bandwidth_current_gbps, formatBandwidth) || '-' }}
+          </div>
         </div>
-        <span class="text-[11px] text-gray-500 font-medium">Core/Mem</span>
+        <span class="text-[11px] text-gray-500 font-medium">Core/Mem/BW</span>
       </div>
     </div>
 
