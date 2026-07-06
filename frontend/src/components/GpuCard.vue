@@ -20,9 +20,9 @@
       </div>
     </div>
 
-    <!-- Summary metrics row with circular gauges -->
+    <!-- Summary metrics row (ordered by training/inference debugging priority) -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 p-4 border-b border-gray-100">
-      <!-- GPU Utilization Gauge -->
+      <!-- 1. GPU Utilization — most critical: low util = data/CPU bottleneck -->
       <CircularGauge
         :value="gpu.utilization_gpu"
         :max="100"
@@ -31,7 +31,7 @@
         :size="90"
       />
 
-      <!-- Memory Controller Gauge -->
+      <!-- 2. Memory — VRAM capacity + controller pressure (OOM risk, bandwidth bottleneck) -->
       <div class="flex flex-col items-center justify-center">
         <CircularGauge
           :value="gpu.utilization_memory"
@@ -46,7 +46,7 @@
         </div>
       </div>
 
-      <!-- Temperature -->
+      <!-- 3. Temperature — thermal throttling indicator -->
       <div class="flex flex-col items-center justify-center">
         <span class="text-lg font-bold tabular-nums" :class="tempColor(gpu.temperature_c)">
           {{ gpu.temperature_c }}<span class="text-sm">°C</span>
@@ -54,20 +54,14 @@
         <span class="text-[11px] text-gray-500 font-medium">Temp</span>
       </div>
 
-      <!-- Power -->
+      <!-- 4. Power — power throttling indicator -->
       <div class="flex flex-col items-center justify-center">
         <span class="text-lg font-bold tabular-nums">{{ gpu.power_w }}<span class="text-sm">W</span></span>
         <span class="text-[11px] text-gray-500 font-medium">Power</span>
         <span class="text-[10px] text-gray-400">{{ gpu.power_limit_w }}W limit</span>
       </div>
 
-      <!-- Fan Speed -->
-      <div class="flex flex-col items-center justify-center">
-        <span class="text-lg font-bold tabular-nums">{{ gpu.fan_speed }}<span class="text-sm">%</span></span>
-        <span class="text-[11px] text-gray-500 font-medium">Fan</span>
-      </div>
-
-      <!-- Clocks -->
+      <!-- 5. Clocks — frequency throttling visible via low clock speeds -->
       <div class="flex flex-col items-center justify-center">
         <div class="text-sm font-bold tabular-nums">
           <div>{{ gpu.clock_core_mhz }}<span class="text-xs">MHz</span></div>
@@ -77,7 +71,7 @@
         <span class="text-[11px] text-gray-500 font-medium">Core/Mem</span>
       </div>
 
-      <!-- PCIe I/O Throughput -->
+      <!-- 6. PCIe I/O — host↔device transfer bottleneck -->
       <div class="flex flex-col items-center justify-center">
         <div class="text-xs font-bold tabular-nums space-y-0.5">
           <div :class="pcieRXColor">
@@ -90,6 +84,12 @@
           </div>
         </div>
         <span class="text-[11px] text-gray-500 font-medium">PCIe I/O</span>
+      </div>
+
+      <!-- 7. Fan — cooling health (least critical for perf debugging) -->
+      <div class="flex flex-col items-center justify-center">
+        <span class="text-lg font-bold tabular-nums">{{ gpu.fan_speed }}<span class="text-sm">%</span></span>
+        <span class="text-[11px] text-gray-500 font-medium">Fan</span>
       </div>
     </div>
 
@@ -322,7 +322,7 @@ const props = defineProps({
   history: { type: Array, default: () => [] },
 })
 
-const expanded = ref(true)
+const expanded = ref(false)
 
 // Computed
 const bar1Percent = computed(() => {
